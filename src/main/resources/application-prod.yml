@@ -1,0 +1,21 @@
+# 生产环境配置
+spring:
+  profiles: prod
+
+# 生产环境配置优化
+server:
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
+# 生产环境日志配置
+logging:
+  level:
+    top.hxll.kimi: WARN
+    org.springframework.web: WARN
+    root: INFO
+  file:
+    name: logs/kimi-api.log
+    max-size: 100MB
+    max-history: 30

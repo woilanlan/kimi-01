@@ -1,0 +1,87 @@
+# Spring Boot 配置文件
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: kimi-api
+  profiles:
+    active: dev
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://192.168.1.200:3306/kimi?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+    username: kimi
+    password: 123456
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 15
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: KimiHikariCP
+      max-lifetime: 900000
+      connection-timeout: 20000
+      connection-test-query: SELECT 1
+
+# MyBatis Plus配置
+mybatis-plus:
+  configuration:
+    # 驼峰命名转换
+    map-underscore-to-camel-case: true
+    # 日志实现
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      # 逻辑删除字段名
+      logic-delete-field: deleted
+      # 逻辑删除值（已删除）
+      logic-delete-value: 1
+      # 逻辑未删除值（未删除）
+      logic-not-delete-value: 0
+      # 主键类型
+      id-type: auto
+      # 字段策略
+      field-strategy: not_null
+  # 扫描Mapper接口
+  mapper-locations: classpath:mapper/*.xml
+
+# JWT配置
+jwt:
+  secret: mySecretKeyForKimiApplicationWithSpringBootAndSecurityFramework2024
+  expiration: 86400      # 访问令牌过期时间（秒）- 24小时
+  refresh-expiration: 604800  # 刷新令牌过期时间（秒）- 7天
+
+# 管理端点配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+
+# 日志配置
+logging:
+  level:
+    top.hxll.kimi: INFO
+    org.springframework.web: INFO
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# 自定义应用信息
+info:
+  app:
+    name: ${spring.application.name}
+    description: Kimi Spring Boot REST API with Spring Security and JWT
+    version: 1.0.0
+    author: kimi

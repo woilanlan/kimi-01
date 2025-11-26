@@ -1,0 +1,12 @@
+# 开发环境配置
+spring:
+  profiles: dev
+
+# 开发环境日志级别更详细
+logging:
+  level:
+    top.hxll.kimi: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    com.baomidou.mybatisplus: DEBUG
+    org.apache.ibatis: DEBUG

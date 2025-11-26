@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="top.hxll.kimi.mapper.UserMapper">
+
+    <!-- 根据用户名查询用户（包含角色和权限） -->
+    <select id="selectUserWithRolesAndPermissions" resultMap="userWithRolesAndPermissionsMap">
+        SELECT
+            u.id, u.username, u.password, u.email, u.phone, u.nickname, u.avatar, u.status,
+            u.last_login_time, u.last_login_ip, u.create_time, u.update_time, u.create_by, u.update_by, u.deleted,
+            r.id as role_id, r.role_name, r.role_code, r.description as role_desc, r.status as role_status,
+            p.id as permission_id, p.permission_name, p.permission_code, p.description as perm_desc,
+            p.path, p.method, p.permission_type
+        FROM sys_user u
+        LEFT JOIN sys_user_role ur ON u.id = ur.user_id
+        LEFT JOIN sys_role r ON ur.role_id = r.id AND r.deleted = 0
+        LEFT JOIN sys_role_permission rp ON r.id = rp.role_id
+        LEFT JOIN sys_permission p ON rp.permission_id = p.id AND p.deleted = 0 AND p.status = 1
+        WHERE u.username = #{username} AND u.deleted = 0 AND u.status = 1
+    </select>
+
+    <!-- 根据用户ID查询权限编码列表 -->
+    <select id="selectPermissionsByUserId" resultType="java.lang.String">
+        SELECT DISTINCT p.permission_code
+        FROM sys_user_role ur
+        JOIN sys_role r ON ur.role_id = r.id AND r.deleted = 0 AND r.status = 1
+        JOIN sys_role_permission rp ON r.id = rp.role_id
+        JOIN sys_permission p ON rp.permission_id = p.id AND p.deleted = 0 AND p.status = 1
+        WHERE ur.user_id = #{userId}
+    </select>
+
+    <!-- 查询用户基本信息（分页）- 只包含列表展示需要的字段 -->
+    <select id="selectUserBasicPage" resultType="top.hxll.kimi.entity.User">
+        SELECT
+            id, username, email, phone, nickname, avatar, status,
+            last_login_time, create_time
+        FROM sys_user
+        ${ew.customSqlSegment}
+    </select>
+
+    <!-- 结果映射 -->
+    <resultMap id="userWithRolesAndPermissionsMap" type="top.hxll.kimi.entity.User">
+        <id property="id" column="id"/>
+        <result property="username" column="username"/>
+        <result property="password" column="password"/>
+        <result property="email" column="email"/>
+        <result property="phone" column="phone"/>
+        <result property="nickname" column="nickname"/>
+        <result property="avatar" column="avatar"/>
+        <result property="status" column="status"/>
+        <result property="lastLoginTime" column="last_login_time"/>
+        <result property="lastLoginIp" column="last_login_ip"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="deleted" column="deleted"/>
+
+        <collection property="roles" ofType="top.hxll.kimi.entity.Role">
+            <id property="id" column="role_id"/>
+            <result property="roleName" column="role_name"/>
+            <result property="roleCode" column="role_code"/>
+            <result property="description" column="role_desc"/>
+            <result property="status" column="role_status"/>
+        </collection>
+
+        <collection property="permissions" ofType="java.lang.String">
+            <result column="permission_code"/>
+        </collection>
+    </resultMap>
+
+</mapper>
