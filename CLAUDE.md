@@ -35,19 +35,37 @@ public class UserService extends ServiceImpl<UserMapper, User> {
 **ALL endpoints must return Result<T>:**
 
 ```java
-// ✓ CORRECT
-public Result<UserDto> getUser(Long id) {
-    return Result.success(dto);
-}
+@RestController
+@RequestMapping("/api/admin/users")
+public class UserController {
+    // ✓ CORRECT
+    @GetMapping("/{id}")
+    public Result<UserDto> getUser(@PathVariable Long id) {
+        return Result.success(dto);
+    }
 
-public Result<Void> deleteUser(Long id) {
-    userService.removeById(id);
-    return Result.success();
-}
+    @PostMapping
+    public Result<Void> createUser(@Valid @RequestBody UserCreateReq req) {
+        userService.createUser(req);
+        return Result.success();
+    }
 
-// ✗ WRONG
-public UserDto getUser(Long id) {  // ❌ Missing Result wrapper
-    return dto;
+    // ✗ WRONG
+    @GetMapping("/{id}")
+    public UserDto getUser(@PathVariable Long id) {  // ❌ Missing Result wrapper
+        return dto;
+    }
+}
+```
+
+**Status codes**: 200=success, 400=business error, 401=unauthorized, 403=forbidden, 500=system error
+
+**Result format**:
+```json
+{
+  "code": 200,
+  "data": {},
+  "msg": "success"
 }
 ```
 
@@ -90,6 +108,50 @@ public Result<UserDto> getUser(@PathVariable Long id) {  // ❌ No security
     // security vulnerability
 }
 ```
+
+### 6. Service Layer Method Calls (强制)
+**Service 层必须使用 this 调用写入方法，利用框架自动填充：**
+
+```java
+// ✓ CORRECT
+public interface UserService extends IService<User> {
+    void createUser(UserCreateReq req);
+}
+
+@Slf4j
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+    @Override
+    @Transactional
+    public void createUser(UserCreateReq req) {
+        // ✅ 使用 this 调用触发自动填充（create_time, create_by）
+        this.save(convertToEntity(req));
+    }
+
+    @Override
+    @Transactional
+    public boolean updateUser(Long id, UserUpdateReq req) {
+        User user = userMapper.selectById(id);  // 查询可用 Mapper
+        user.setName(req.getName());
+
+        // ✅ 更新必须用 this 触发自动填充（update_time, update_by）
+        return this.updateById(user);
+    }
+}
+
+// ✗ WRONG
+@Service
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+    @Override
+    @Transactional
+    public void createUser(UserCreateReq req) {
+        // ❌ 绕过自动填充
+        userMapper.insert(entity);
+    }
+}
+```
+
+**规则**：查询可用 Mapper，写入必须用 `this`（触发自动填充机制）
 
 ## 📦 PROJECT STRUCTURE
 
@@ -137,115 +199,14 @@ mvn clean package -DskipTests
 
 ## 🎯 QUICK REFERENCE
 
-### Security Annotations
-| Annotation | Usage | Example |
-|------------|-------|---------|
-| `@PreAuthorize("hasRole('ADMIN')")` | Role check | Class/Method |
-| `@PreAuthorize("hasAuthority('user:query')")` | Permission check | Method |
-| `@Transactional` | Write operations | Service method |
-| `@Valid` | Parameter validation | Controller param |
-| `@Slf4j` | Logging | Class |
-
-### Permission Format
-```
-格式: 资源:操作
-user:query, user:add, user:update, user:delete
-role:query, role:add, role:update, role:delete
-permission:query, permission:add, permission:update, permission:delete
-```
-
-### Result<T> Response
-```json
-{
-  "code": 200,
-  "data": {},
-  "msg": "success"
-}
-```
-
-**Status codes**: 200=success, 400=business error, 401=unauthorized, 403=forbidden, 500=system error
-
-### DTO Naming
-- Request: `XxxReq.java` (e.g., UserCreateReq)
-- Response: `XxxResp.java` (e.g., JwtResp)
-- Data: `XxxDto.java` (e.g., UserDto)
-
-### JWT Headers
-```
-Authorization: Bearer <accessToken>
-```
-
-### Common Operations (MyBatis Plus)
-```java
-// Query
-userMapper.selectById(id);
-userMapper.selectList(wrapper);
-userMapper.selectPage(page, wrapper);
-
-// Write
-userMapper.insert(entity);
-userMapper.updateById(entity);
-userMapper.deleteById(id);
-
-// Wrapper
-LambdaQueryWrapper<User> wrapper = Wrappers.lambdaQuery();
-wrapper.eq(User::getUsername, "admin")
-       .like(User::getNickname, "张");
-```
-
-### Controller Template
-```java
-@RestController
-@RequestMapping("/api/admin/users")
-@RequiredArgsConstructor
-public class UserController {
-    private final UserService userService;
-
-    @GetMapping
-    @PreAuthorize("hasAuthority('user:query')")
-    public Result<Page<UserDto>> listUsers(SortPageReq req) {
-        return Result.success(userService.listUsers(req));
-    }
-
-    @PostMapping
-    @PreAuthorize("hasAuthority('user:add')")
-    @Transactional(rollbackFor = Exception.class)
-    public Result<Void> createUser(@Valid @RequestBody UserCreateReq req) {
-        userService.createUser(req);
-        return Result.success();
-    }
-}
-```
-
-### Service Template
-```java
-public interface UserService extends IService<User> {
-    void createUser(UserCreateReq req);
-    UserDto getUserById(Long id);
-}
-
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void createUser(UserCreateReq req) {
-        log.info("【UserService】创建用户：{}", req.getUsername());
-        save(convertToEntity(req));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public UserDto getUserById(Long id) {
-        User user = getById(id);
-        if (user == null) {
-            throw new UserException("用户不存在");
-        }
-        return convertToDto(user);
-    }
-}
-```
+| 项目 | 说明                                           | 示例 |
+|------|----------------------------------------------|------|
+| **Security** | `@PreAuthorize("hasAuthority('user:query')")` | Class/Method |
+| **Transaction** | `@Transactional` on write ops                | Service method |
+| **JWT Header** | `Authorization: Bearer <token>`              | - |
+| **Permission** | 格式: `资源:操作`                                  | `user:query`, `role:add` |
+| **DTO Naming** | Req=请求, Resp=响应, Dto=数据                      | `UserCreateReq` |
+| **MyBatis Plus** | 查询用 Mapper, 写入用 `this`                       | `userMapper.selectById()`<br>`this.save()` |
 
 ## ✅ CODE CHECKLIST
 
@@ -261,6 +222,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 - [ ] `@Slf4j` and proper logging used
 - [ ] DTO naming follows convention
 - [ ] Validation with `@Valid` where needed
+- [ ] **Service 层写入操作使用 `this` 调用**（触发自动填充）
 
 ### Before Submitting
 - [ ] Security annotations present

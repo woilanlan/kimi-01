@@ -1,6 +1,8 @@
 package top.hxll.kimi.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -14,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 import top.hxll.kimi.dto.*;
 import top.hxll.kimi.dto.req.auth.RegisterReq;
 import top.hxll.kimi.dto.req.user.PasswordChangeReq;
@@ -29,6 +32,7 @@ import top.hxll.kimi.mapper.RoleMapper;
 import top.hxll.kimi.mapper.UserMapper;
 import top.hxll.kimi.mapper.UserRoleMapper;
 import top.hxll.kimi.security.service.UserDetailsImpl;
+import top.hxll.kimi.service.UserRoleService;
 import top.hxll.kimi.service.UserService;
 
 import java.time.LocalDateTime;
@@ -46,9 +50,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
+    /**
+     * 默认密码（重置密码时使用）
+     */
+    private static final String DEFAULT_PASSWORD = "123456";
+
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
-    private final UserRoleMapper userRoleMapper;
+    private final UserRoleService userRoleService;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -95,7 +104,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setAvatar("/default-avatar.png"); // 默认头像
 
         // 保存用户
-        userMapper.insert(user);
+        this.save(user);
 
         // 分配默认角色
         String roleCode = registerReq.getRoleCode() != null ? registerReq.getRoleCode() : "user";
@@ -105,7 +114,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             userRole.setUserId(user.getId());
             userRole.setRoleId(role.getId());
             userRole.setCreateBy(user.getId());
-            userRoleMapper.insert(userRole);
+            userRoleService.save(userRole);
             log.info("Assigned role {} to user {}", roleCode, user.getUsername());
         }
 
@@ -118,10 +127,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public boolean changePassword(Long userId, PasswordChangeReq passwordChangeReq) {
         log.info("Changing password for user: {}", userId);
 
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new UserException("用户不存在");
-        }
+        User user = getUserByIdOrThrow(userId);
 
         // 验证旧密码
         if (!passwordEncoder.matches(passwordChangeReq.getOldPassword(), user.getPassword())) {
@@ -138,35 +144,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setUpdateTime(LocalDateTime.now());
         user.setUpdateBy(userId);
 
-        int result = userMapper.updateById(user);
+        boolean result = this.updateById(user);
         log.info("Password changed successfully for user: {}", userId);
-        return result > 0;
+        return result;
     }
 
     @Override
     @Transactional
-    public boolean resetPassword(Long userId, String newPassword) {
+    public boolean resetPassword(Long userId) {
         log.info("Resetting password for user: {}", userId);
 
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new UserException("用户不存在");
-        }
+        User user = getUserByIdOrThrow(userId);
 
-        user.setPassword(passwordEncoder.encode(newPassword));
-        user.setUpdateTime(LocalDateTime.now());
+        // 重置为默认密码
+        user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
+        log.info("Password will be reset to default: '{}'", DEFAULT_PASSWORD);
 
-        int result = userMapper.updateById(user);
+        boolean result = this.updateById(user);
         log.info("Password reset successfully for user: {}", userId);
-        return result > 0;
+        return result;
     }
 
     @Override
     public UserDto getUserWithRolesAndPermissions(Long userId) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new UserException("用户不存在");
-        }
+        User user = getUserByIdOrThrow(userId);
         return convertToDtoWithRolesAndPermissions(user);
     }
 
@@ -211,10 +212,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     @Transactional
     public boolean updateUserInfo(Long userId, UserUpdateReq updateRequest) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new UserException("用户不存在");
-        }
+        User user = getUserByIdOrThrow(userId);
 
         // 更新用户信息
         if (updateRequest.getEmail() != null) {
@@ -236,43 +234,40 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setUpdateTime(LocalDateTime.now());
         user.setUpdateBy(UserContextUtils.getCurrentUserId());
 
-        int result = userMapper.updateById(user);
+        boolean result = this.updateById(user);
 
         // 更新角色关联
         if (updateRequest.getRoleIds() != null) {
             updateUserRoles(userId, Arrays.asList(updateRequest.getRoleIds()));
         }
 
-        return result > 0;
+        return result;
     }
 
     @Override
     @Transactional
     public boolean deleteUser(Long userId) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new UserException("用户不存在");
-        }
+        // 验证用户存在
+        getUserByIdOrThrow(userId);
 
-        // 逻辑删除
-        user.setDeleted(1);
-        user.setUpdateTime(LocalDateTime.now());
-        user.setUpdateBy(UserContextUtils.getCurrentUserId());
-
-        int result = userMapper.updateById(user);
+        // 逻辑删除 - 使用 UpdateWrapper 配合框架自动填充
+        // 设置 deleted = 1，触发自动填充 update_time 和 update_by
+        UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
+        updateWrapper.eq("id", userId).set("deleted", 1);
+        boolean result = this.update(updateWrapper);
 
         // 删除用户角色关联
-        userRoleMapper.deleteByUserId(userId);
+        userRoleService.deleteByUserId(userId);
 
         log.info("User deleted logically: {}", userId);
-        return result > 0;
+        return result;
     }
 
     @Override
     @Transactional
     public boolean updateUserRoles(Long userId, List<Long> roleIds) {
         // 删除原有角色关联
-        userRoleMapper.deleteByUserId(userId);
+        userRoleService.deleteByUserId(userId);
 
         // 添加新角色关联
         if (!CollectionUtils.isEmpty(roleIds)) {
@@ -288,7 +283,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                     .collect(Collectors.toList());
 
             if (!userRoles.isEmpty()) {
-                userRoleMapper.batchInsert(userRoles);
+                userRoleService.batchInsert(userRoles);
             }
         }
 
@@ -323,7 +318,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setCreateBy(UserContextUtils.getCurrentUserId());
         user.setCreateTime(LocalDateTime.now());
 
-        userMapper.insert(user);
+        this.save(user);
 
         // 分配角色
         if (createRequest.getRoleIds() != null && createRequest.getRoleIds().length > 0) {
@@ -338,46 +333,35 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     @Transactional
     public boolean toggleUserStatus(Long userId, Integer status) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new UserException("用户不存在");
-        }
+        User user = getUserByIdOrThrow(userId);
 
         user.setStatus(status);
         user.setUpdateTime(LocalDateTime.now());
         user.setUpdateBy(UserContextUtils.getCurrentUserId());
 
-        int result = userMapper.updateById(user);
+        boolean result = this.updateById(user);
         log.info("User status changed: {} -> {}", userId, status);
-        return result > 0;
+        return result;
     }
 
     @Override
     @Transactional
     public boolean deleteUsers(List<Long> userIds) {
-        if (userIds == null || userIds.isEmpty()) {
+        if (ObjectUtils.isEmpty(userIds)) {
             return true;
         }
-
         log.info("Batch deleting users: {}", userIds);
 
-        // 批量逻辑删除用户
-        List<User> users = userIds.stream()
-                .map(userId -> {
-                    User user = new User();
-                    user.setId(userId);
-                    user.setDeleted(1);
-                    user.setUpdateTime(LocalDateTime.now());
-                    user.setUpdateBy(UserContextUtils.getCurrentUserId());
-                    return user;
-                })
-                .collect(Collectors.toList());
+        LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.in(User::getId, userIds)
+                .set(User::getDeleted, 1)
+                .set(User::getUpdateTime, LocalDateTime.now())
+                .set(User::getUpdateBy, UserContextUtils.getCurrentUserId());
 
-        // 批量更新用户
-        users.forEach(user -> userMapper.updateById(user));
+        this.update(updateWrapper);
 
         // 批量删除用户角色关联
-        userIds.forEach(userRoleMapper::deleteByUserId);
+        userRoleService.deleteByUserIds(userIds);
 
         log.info("Batch deleted {} users", userIds.size());
         return true;
@@ -402,6 +386,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         statistics.put("inactive", userMapper.selectCount(wrapper));
 
         return statistics;
+    }
+
+    /**
+     * 根据ID获取用户，不存在则抛出异常
+     *
+     * @param userId 用户ID
+     * @return 用户实体
+     * @throws UserException 用户不存在时抛出
+     */
+    private User getUserByIdOrThrow(Long userId) {
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new UserException("用户不存在");
+        }
+        return user;
     }
 
     /**

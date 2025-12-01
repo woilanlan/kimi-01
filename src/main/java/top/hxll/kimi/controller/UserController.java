@@ -120,16 +120,14 @@ public class UserController {
     }
 
     /**
-     * 重置用户密码
+     * 重置用户密码（重置为默认密码: 123456）
      */
     @PutMapping("/{id}/reset-password")
     @PreAuthorize("hasRole('ADMIN')")
-    public Result<Object> resetPassword(
-            @PathVariable @NotNull Long id,
-            @RequestParam @NotNull String newPassword) {
+    public Result<Object> resetPassword(@PathVariable @NotNull Long id) {
         log.info("Resetting password for user: {}", id);
-        boolean result = userService.resetPassword(id, newPassword);
-        return result ? Result.success("密码重置成功") : Result.error("密码重置失败");
+        boolean result = userService.resetPassword(id);
+        return result ? Result.success("密码重置成功，默认密码为：123456") : Result.error("密码重置失败");
     }
 
     /**

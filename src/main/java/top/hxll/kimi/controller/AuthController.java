@@ -6,7 +6,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import top.hxll.kimi.common.Result;
@@ -20,8 +19,8 @@ import top.hxll.kimi.dto.req.user.PasswordChangeReq;
 import top.hxll.kimi.dto.resp.JwtResp;
 import top.hxll.kimi.entity.User;
 import top.hxll.kimi.mapper.UserMapper;
-import top.hxll.kimi.security.service.UserDetailsServiceImpl;
 import top.hxll.kimi.security.service.UserDetailsImpl;
+import top.hxll.kimi.security.service.UserDetailsServiceImpl;
 import top.hxll.kimi.security.util.JwtUtils;
 import top.hxll.kimi.service.UserService;
 
@@ -45,7 +44,6 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
     private final UserMapper userMapper;
-    private final PasswordEncoder passwordEncoder;
     private final UserDetailsServiceImpl userDetailsService;
     private final UserService userService;
 

@@ -32,8 +32,9 @@ public interface UserService {
 
     /**
      * 重置密码（管理员操作）
+     * 重置为默认密码: 123456
      */
-    boolean resetPassword(Long userId, String newPassword);
+    boolean resetPassword(Long userId);
 
     /**
      * 获取用户信息（包含角色和权限）
