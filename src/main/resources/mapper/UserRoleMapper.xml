@@ -3,11 +3,6 @@
 
 <mapper namespace="top.hxll.kimi.mapper.UserRoleMapper">
 
-    <!-- 根据用户ID删除用户角色关联 -->
-    <delete id="deleteByUserId">
-        DELETE FROM sys_user_role WHERE user_id = #{userId}
-    </delete>
-
     <!-- 批量插入用户角色关联 -->
     <insert id="batchInsert">
         INSERT INTO sys_user_role (user_id, role_id, create_by, create_time)

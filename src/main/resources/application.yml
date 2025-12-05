@@ -22,12 +22,11 @@ spring:
     hikari:
       minimum-idle: 5
       maximum-pool-size: 15
-      auto-commit: true
+      auto-commit: false
       idle-timeout: 30000
-      pool-name: KimiHikariCP
-      max-lifetime: 900000
+      max-lifetime: 30000
       connection-timeout: 20000
-      connection-test-query: SELECT 1
+      pool-name: KimiHikariCP
 
 # MyBatis Plus配置
 mybatis-plus:

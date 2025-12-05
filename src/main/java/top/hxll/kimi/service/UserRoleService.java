@@ -19,7 +19,7 @@ public interface UserRoleService extends IService<UserRole> {
      * @param userId 用户ID
      * @return 删除的记录数
      */
-    int deleteByUserId(Long userId);
+    boolean deleteByUserId(Long userId);
 
     /**
      * 根据用户ID列表批量删除用户角色关联

@@ -8,6 +8,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import top.hxll.kimi.common.PageReq;
 import top.hxll.kimi.common.Result;
+import top.hxll.kimi.common.exception.PasswordException;
 import top.hxll.kimi.dto.*;
 import top.hxll.kimi.dto.req.user.UserCreateReq;
 import top.hxll.kimi.dto.req.user.UserUpdateReq;
@@ -65,9 +66,13 @@ public class UserController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public Result<User> createUser(@Valid @RequestBody UserCreateReq createRequest) {
-        log.info("Creating user: {}", createRequest.getUsername());
-        User user = userService.createUser(createRequest);
+    public Result<User> createUser(@Valid @RequestBody UserCreateReq req) {
+        log.info("Creating user: {}", req.getUsername());
+        // 验证密码一致性
+        if (!req.isPasswordMatch()) {
+            return Result.error("两次输入的密码不一致");
+        }
+        User user = userService.createUser(req);
         return Result.success("用户创建成功", user);
     }
 
@@ -138,7 +143,7 @@ public class UserController {
     public Result<Object> updateUserRoles(
             @PathVariable @NotNull Long id,
             @RequestBody Long[] roleIds) {
-        log.info("Updating roles for user: {} -\u003e {}", id, roleIds);
+        log.info("Updating roles for user: {} - {}", id, roleIds);
 
         boolean result = userService.updateUserRoles(id, Arrays.asList(roleIds));
         return result ? Result.success("用户角色更新成功") : Result.error("用户角色更新失败");

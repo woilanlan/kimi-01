@@ -1,5 +1,6 @@
 package top.hxll.kimi.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
@@ -28,9 +29,13 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Override
     @Transactional
-    public int deleteByUserId(Long userId) {
+    public boolean deleteByUserId(Long userId) {
         log.debug("删除用户角色关联, userId: {}", userId);
-        return userRoleMapper.deleteByUserId(userId);
+
+        // 删除用户角色关联(不触发自动填充)
+        LambdaQueryWrapper<UserRole> qw = new LambdaQueryWrapper<>();
+        qw.eq(UserRole::getUserId, userId);
+        return this.remove(qw);
     }
 
     @Override

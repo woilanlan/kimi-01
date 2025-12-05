@@ -2,11 +2,13 @@ package top.hxll.kimi.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.IService;
 import top.hxll.kimi.dto.RoleDto;
 import top.hxll.kimi.entity.Role;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 角色服务接口
@@ -14,7 +16,14 @@ import java.util.Map;
  * @author kimi
  * @since 1.0.0
  */
-public interface RoleService {
+public interface RoleService extends IService<Role> {
+
+    /**
+     * 根据角色ID列表获取有效的角色ID集合
+     * @param roleIds 角色ID列表
+     * @return 有效的角色ID集合
+     */
+    Set<Long> getValidRoleIds(List<Long> roleIds);
 
     /**
      * 获取所有角色列表

@@ -54,6 +54,11 @@ public class AuthController {
     public Result<Object> register(@Valid @RequestBody RegisterReq registerReq) {
         log.info("User registration attempt: {}", registerReq.getUsername());
 
+        // 验证新密码是否一致
+        if (!registerReq.isPasswordMatch()) {
+            return Result.error("两次输入的新密码不一致");
+        }
+
         // 注册用户（Service层会验证密码一致性并抛出异常）
         User user = userService.register(registerReq);
 

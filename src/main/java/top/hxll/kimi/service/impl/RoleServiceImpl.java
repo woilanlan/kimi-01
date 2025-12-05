@@ -1,5 +1,6 @@
 package top.hxll.kimi.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -39,6 +40,20 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     private final RoleMapper roleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final UserRoleMapper userRoleMapper;
+
+
+    @Override
+    public Set<Long> getValidRoleIds(List<Long> roleIds) {
+        if (CollectionUtils.isEmpty(roleIds)) {
+            return Collections.emptySet();
+        }
+
+        LambdaQueryWrapper<Role> qw = new LambdaQueryWrapper<Role>()
+                .in(Role::getId, roleIds)
+                .select(Role::getId);
+
+        return new HashSet<>(this.listObjs(qw, obj -> (Long) obj));
+    }
 
     @Override
     public List<RoleDto> getAllRoles() {

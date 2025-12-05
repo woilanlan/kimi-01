@@ -17,11 +17,6 @@ import java.util.List;
 public interface UserRoleMapper extends BaseMapper<UserRole> {
 
     /**
-     * 根据用户ID删除用户角色关联
-     */
-    int deleteByUserId(@Param("userId") Long userId);
-
-    /**
      * 批量插入用户角色关联
      */
     int batchInsert(@Param("userRoles") List<UserRole> userRoles);
